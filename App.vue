@@ -486,7 +486,8 @@ import axios from 'axios';
 import QRCode from 'qrcode';
 import { Html5Qrcode } from 'html5-qrcode';
 
-const API_URL = 'http://localhost:3000/api';
+const API_URL = '/api';
+
 
 export default {
   name: 'App',
