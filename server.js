@@ -1,8 +1,9 @@
-// server.js - Backend API сервер
+// server.js - Backend API + Frontend сервер
 import express from 'express';
 import mysql from 'mysql2/promise';
 import cors from 'cors';
 import bodyParser from 'body-parser';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -12,6 +13,13 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
+
+// ======== Проверка содержимого корня (для Render) ========
+try {
+  console.log('📁 Файлы в корне проекта:', fs.readdirSync('.'));
+} catch (e) {
+  console.warn('Не удалось прочитать содержимое директории.');
+}
 
 // ======== Подключение к MySQL ========
 const dbConfig = {
@@ -79,22 +87,6 @@ app.post('/api/employees', async (req, res) => {
   }
 });
 
-app.delete('/api/employees/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const [users] = await pool.query('SELECT name FROM users WHERE id = ?', [id]);
-    const name = users[0]?.name || 'Неизвестный';
-
-    await pool.query('DELETE FROM users WHERE id = ?', [id]);
-    await pool.query('INSERT INTO admin_logs (message) VALUES (?)', [`Удален сотрудник: ${name}`]);
-
-    res.json({ message: 'Сотрудник удален' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // ======== GUESTS ========
 app.get('/api/guests', async (req, res) => {
   try {
@@ -123,34 +115,22 @@ app.post('/api/guests', async (req, res) => {
   }
 });
 
-app.delete('/api/guests/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const [guests] = await pool.query('SELECT name FROM guests WHERE id = ?', [id]);
-    const name = guests[0]?.name || 'Неизвестный';
-
-    await pool.query('DELETE FROM guests WHERE id = ?', [id]);
-    await pool.query('INSERT INTO admin_logs (message) VALUES (?)', [`Удален гость: ${name}`]);
-
-    res.json({ message: 'Гость удален' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ======== FRONTEND SERVE (Vue) ========
+// ======== FRONTEND (VUE) ========
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-app.use(express.static(path.join(__dirname, 'dist')));
+const distPath = path.join(__dirname, 'dist');
+if (fs.existsSync(distPath)) {
+  console.log('✅ Найдена папка dist, подключаем фронтенд...');
+  app.use(express.static(distPath));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+} else {
+  console.warn('⚠️ Папка dist не найдена, Vue не будет отображаться.');
+}
 
-// Все маршруты → index.html (SPA)
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
-});
-
-// ======== HEALTH CHECK (для Render) ========
+// ======== HEALTH CHECK ========
 app.get('/api/health', (req, res) => {
   res.status(200).send('OK');
 });
